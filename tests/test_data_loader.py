@@ -15,7 +15,7 @@ def test_fetch_price_data_returns_prices_for_valid_tickers(monkeypatch):
         "MSFT": _fake_price_frame([200, 202, 201]),
     }
 
-    def fake_download(ticker, start=None, end=None, progress=False):
+    def fake_download(ticker, start=None, end=None, progress=False, auto_adjust=False):
         return frames[ticker]
 
     monkeypatch.setattr(data_loader.yf, "download", fake_download)
@@ -34,7 +34,7 @@ def test_fetch_price_data_drops_invalid_ticker(monkeypatch):
         "FAKE": pd.DataFrame(),
     }
 
-    def fake_download(ticker, start=None, end=None, progress=False):
+    def fake_download(ticker, start=None, end=None, progress=False, auto_adjust=False):
         return frames[ticker]
 
     monkeypatch.setattr(data_loader.yf, "download", fake_download)
@@ -45,6 +45,29 @@ def test_fetch_price_data_drops_invalid_ticker(monkeypatch):
     assert list(prices.columns) == ["AAPL", "MSFT"]
 
 
+def test_fetch_price_data_drops_ticker_with_all_nan_adj_close(monkeypatch):
+    frames = {
+        "AAPL": _fake_price_frame([100, 101, 102]),
+        "MSFT": _fake_price_frame([200, 202, 201]),
+        "DELISTED": pd.DataFrame(
+            {"Adj Close": [float("nan"), float("nan"), float("nan")]},
+            index=pd.date_range("2024-01-01", periods=3),
+        ),
+    }
+
+    def fake_download(ticker, start=None, end=None, progress=False, auto_adjust=False):
+        return frames[ticker]
+
+    monkeypatch.setattr(data_loader.yf, "download", fake_download)
+
+    prices, dropped = data_loader.fetch_price_data(
+        ["AAPL", "MSFT", "DELISTED"], "2024-01-01", "2024-01-03"
+    )
+
+    assert dropped == ["DELISTED"]
+    assert list(prices.columns) == ["AAPL", "MSFT"]
+
+
 def test_fetch_price_data_raises_when_fewer_than_two_valid_tickers(monkeypatch):
     frames = {
         "AAPL": _fake_price_frame([100, 101, 102]),
@@ -52,7 +75,7 @@ def test_fetch_price_data_raises_when_fewer_than_two_valid_tickers(monkeypatch):
         "FAKE2": pd.DataFrame(),
     }
 
-    def fake_download(ticker, start=None, end=None, progress=False):
+    def fake_download(ticker, start=None, end=None, progress=False, auto_adjust=False):
         return frames[ticker]
 
     monkeypatch.setattr(data_loader.yf, "download", fake_download)
@@ -64,7 +87,7 @@ def test_fetch_price_data_raises_when_fewer_than_two_valid_tickers(monkeypatch):
 def test_fetch_benchmark_prices_returns_series(monkeypatch):
     monkeypatch.setattr(
         data_loader.yf, "download",
-        lambda ticker, start=None, end=None, progress=False: _fake_price_frame([1000, 1010, 1005]),
+        lambda ticker, start=None, end=None, progress=False, auto_adjust=False: _fake_price_frame([1000, 1010, 1005]),
     )
 
     series = data_loader.fetch_benchmark_prices("^GSPC", "2024-01-01", "2024-01-03")
@@ -75,7 +98,7 @@ def test_fetch_benchmark_prices_returns_series(monkeypatch):
 def test_fetch_benchmark_prices_raises_when_empty(monkeypatch):
     monkeypatch.setattr(
         data_loader.yf, "download",
-        lambda ticker, start=None, end=None, progress=False: pd.DataFrame(),
+        lambda ticker, start=None, end=None, progress=False, auto_adjust=False: pd.DataFrame(),
     )
 
     with pytest.raises(data_loader.InsufficientDataError):

@@ -11,8 +11,8 @@ def fetch_price_data(tickers, start, end):
     valid_prices = {}
     dropped_tickers = []
     for ticker in tickers:
-        data = yf.download(ticker, start=start, end=end, progress=False)
-        if data.empty or "Adj Close" not in data.columns:
+        data = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=False)
+        if data.empty or "Adj Close" not in data.columns or data["Adj Close"].dropna().empty:
             dropped_tickers.append(ticker)
             continue
         valid_prices[ticker] = data["Adj Close"]
@@ -27,8 +27,8 @@ def fetch_price_data(tickers, start, end):
 
 
 def fetch_benchmark_prices(ticker, start, end):
-    data = yf.download(ticker, start=start, end=end, progress=False)
-    if data.empty or "Adj Close" not in data.columns:
+    data = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=False)
+    if data.empty or "Adj Close" not in data.columns or data["Adj Close"].dropna().empty:
         raise InsufficientDataError(f"No data available for benchmark ticker '{ticker}'.")
     return data["Adj Close"]
 
