@@ -93,4 +93,10 @@ def efficient_frontier(mean_returns, cov_matrix, num_points=50):
                 "volatility": float(np.sqrt(result.fun)),
                 "weights": result.x,
             })
+    if not frontier:
+        raise ValueError(
+            "Could not compute an efficient frontier: no target return produced a "
+            "feasible portfolio (this can happen when all assets have very similar "
+            "expected returns)."
+        )
     return frontier

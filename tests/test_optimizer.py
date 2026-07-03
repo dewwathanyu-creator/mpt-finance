@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import mpt_finance.optimizer as optimizer_module
 from mpt_finance.optimizer import (
     max_sharpe_weights,
     min_variance_weights,
@@ -47,3 +48,24 @@ def test_efficient_frontier_returns_valid_points():
         assert point["weights"].sum() == pytest.approx(1.0, abs=1e-4)
         assert point["volatility"] >= 0
         assert (point["weights"] >= -1e-6).all()
+
+
+def test_efficient_frontier_raises_when_no_points_are_feasible(monkeypatch):
+    # Force every SLSQP call made inside efficient_frontier() to fail to converge
+    # (e.g. as happens in practice when all assets have near-identical expected
+    # returns and the target-return / sum-to-one constraints become degenerate),
+    # so the resulting frontier list is empty and should raise a clear error
+    # instead of silently returning [].
+    original_minimize = optimizer_module.minimize
+
+    def failing_minimize(*args, **kwargs):
+        result = original_minimize(*args, **kwargs)
+        result.success = False
+        return result
+
+    monkeypatch.setattr(optimizer_module, "minimize", failing_minimize)
+
+    equal_mean_returns = np.array([0.10, 0.10])
+    cov_matrix = np.array([[0.04, 0.0], [0.0, 0.09]])
+    with pytest.raises(ValueError):
+        efficient_frontier(equal_mean_returns, cov_matrix, num_points=10)
