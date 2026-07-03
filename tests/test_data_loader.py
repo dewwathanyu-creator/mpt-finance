@@ -9,6 +9,13 @@ def _fake_price_frame(values):
     return pd.DataFrame({"Adj Close": values}, index=dates)
 
 
+def _fake_multiindex_price_frame(values, ticker):
+    dates = pd.date_range("2024-01-01", periods=len(values))
+    frame = pd.DataFrame({"Adj Close": values}, index=dates)
+    frame.columns = pd.MultiIndex.from_product([frame.columns, [ticker]])
+    return frame
+
+
 def test_fetch_price_data_returns_prices_for_valid_tickers(monkeypatch):
     frames = {
         "AAPL": _fake_price_frame([100, 101, 102]),
@@ -84,10 +91,43 @@ def test_fetch_price_data_raises_when_fewer_than_two_valid_tickers(monkeypatch):
         data_loader.fetch_price_data(["AAPL", "FAKE1", "FAKE2"], "2024-01-01", "2024-01-03")
 
 
+def test_fetch_price_data_handles_multiindex_columns_from_real_yfinance(monkeypatch):
+    frames = {
+        "AAPL": _fake_multiindex_price_frame([100, 101, 102], "AAPL"),
+        "MSFT": _fake_multiindex_price_frame([200, 202, 201], "MSFT"),
+    }
+
+    def fake_download(ticker, start=None, end=None, progress=False, auto_adjust=False):
+        return frames[ticker]
+
+    monkeypatch.setattr(data_loader.yf, "download", fake_download)
+
+    prices, dropped = data_loader.fetch_price_data(["AAPL", "MSFT"], "2024-01-01", "2024-01-03")
+
+    assert dropped == []
+    assert list(prices.columns) == ["AAPL", "MSFT"]
+    assert prices.shape == (3, 2)
+    assert prices["AAPL"].tolist() == [100, 101, 102]
+    assert prices["MSFT"].tolist() == [200, 202, 201]
+
+
 def test_fetch_benchmark_prices_returns_series(monkeypatch):
     monkeypatch.setattr(
         data_loader.yf, "download",
         lambda ticker, start=None, end=None, progress=False, auto_adjust=False: _fake_price_frame([1000, 1010, 1005]),
+    )
+
+    series = data_loader.fetch_benchmark_prices("^GSPC", "2024-01-01", "2024-01-03")
+
+    assert series.tolist() == [1000, 1010, 1005]
+
+
+def test_fetch_benchmark_prices_handles_multiindex_columns_from_real_yfinance(monkeypatch):
+    monkeypatch.setattr(
+        data_loader.yf, "download",
+        lambda ticker, start=None, end=None, progress=False, auto_adjust=False: _fake_multiindex_price_frame(
+            [1000, 1010, 1005], "^GSPC"
+        ),
     )
 
     series = data_loader.fetch_benchmark_prices("^GSPC", "2024-01-01", "2024-01-03")
