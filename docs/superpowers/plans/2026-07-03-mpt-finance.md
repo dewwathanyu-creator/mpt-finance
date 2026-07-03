@@ -863,11 +863,11 @@ if run_button:
     try:
         max_sharpe_w = max_sharpe_weights(mean_returns, cov_matrix, risk_free_rate)
         min_var_w = min_variance_weights(mean_returns, cov_matrix)
+        frontier = efficient_frontier(mean_returns, cov_matrix)
     except ValueError as exc:
         st.error(f"Optimization failed: {exc}")
         st.stop()
 
-    frontier = efficient_frontier(mean_returns, cov_matrix)
     mc_portfolios = random_portfolios(mean_returns, cov_matrix, risk_free_rate)
 
     tab_frontier, tab_corr, tab_backtest, tab_weights = st.tabs(
