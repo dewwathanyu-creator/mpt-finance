@@ -20,6 +20,8 @@ from mpt_finance.optimizer import (
 )
 from mpt_finance.simulate import random_portfolios
 
+DATE_TRIM_WARNING_THRESHOLD = pd.Timedelta(days=5)
+
 st.set_page_config(page_title="MPT Finance", layout="wide")
 st.title("MPT Finance — Portfolio Optimizer")
 st.caption(
@@ -57,7 +59,7 @@ if run_button:
         st.warning(f"Dropped tickers with no data: {', '.join(dropped)}")
 
     requested_start = pd.Timestamp(start_date)
-    if not prices.empty and prices.index.min() > requested_start + pd.Timedelta(days=5):
+    if not prices.empty and prices.index.min() > requested_start + DATE_TRIM_WARNING_THRESHOLD:
         st.info(
             f"Data only available from {prices.index.min().date()} onward for one or more "
             "tickers; the analysis uses this shorter overlapping date range."
@@ -75,6 +77,34 @@ if run_button:
         st.stop()
 
     mc_portfolios = random_portfolios(mean_returns, cov_matrix, risk_free_rate)
+
+    st.session_state["results"] = {
+        "returns": returns,
+        "mean_returns": mean_returns,
+        "cov_matrix": cov_matrix,
+        "max_sharpe_w": max_sharpe_w,
+        "min_var_w": min_var_w,
+        "frontier": frontier,
+        "mc_portfolios": mc_portfolios,
+        "risk_free_rate": risk_free_rate,
+        "benchmark_ticker": benchmark_ticker,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+if "results" in st.session_state:
+    r = st.session_state["results"]
+    returns = r["returns"]
+    mean_returns = r["mean_returns"]
+    cov_matrix = r["cov_matrix"]
+    max_sharpe_w = r["max_sharpe_w"]
+    min_var_w = r["min_var_w"]
+    frontier = r["frontier"]
+    mc_portfolios = r["mc_portfolios"]
+    risk_free_rate = r["risk_free_rate"]
+    benchmark_ticker = r["benchmark_ticker"]
+    start_date = r["start_date"]
+    end_date = r["end_date"]
 
     tab_frontier, tab_corr, tab_backtest, tab_weights = st.tabs(
         ["Efficient Frontier & Monte Carlo", "Correlation", "Backtest vs Benchmark", "Portfolio Weights"]
@@ -116,12 +146,12 @@ if run_button:
         )
 
     with tab_backtest:
+        benchmark_returns = None
         try:
             benchmark_prices = fetch_benchmark_prices(benchmark_ticker, start_date, end_date)
-            benchmark_returns = benchmark_prices.pct_change().dropna()
-        except InsufficientDataError as exc:
-            benchmark_returns = None
-            st.warning(f"{exc} Skipping backtest.")
+            benchmark_returns = compute_daily_returns(benchmark_prices)
+        except Exception as exc:
+            st.warning(f"Could not load benchmark data ({exc}); skipping backtest.")
 
         if benchmark_returns is not None:
             cumulative, summary = backtest_portfolio(returns, max_sharpe_w, benchmark_returns, risk_free_rate)
