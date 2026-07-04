@@ -4,7 +4,7 @@ A Streamlit app that helps build the best-performing investment portfolio for a 
 level of risk, based on Modern Portfolio Theory (MPT). Enter a list of tickers (Thai SET
 or global), and the app finds the asset mix that maximizes risk-adjusted return.
 
-**Live demo:** _add your Streamlit Community Cloud URL here after deploying_
+**Live demo:** [mpt-finance.streamlit.app](https://mpt-finance.streamlit.app/)
 
 ## Why this matters for investors
 
